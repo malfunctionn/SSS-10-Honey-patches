@@ -1,0 +1,89 @@
+{
+  "name": "freed_session",
+  "options": {
+    "pool": 2,
+    "redact": "on"
+  },
+  "steps": [
+    {
+      "conn": "B",
+      "method": "POST",
+      "path": "/heartbeat",
+      "body": {
+        "payload": "hello",
+        "len": 3
+      }
+    },
+    {
+      "conn": "B",
+      "op": "close"
+    },
+    {
+      "conn": "A",
+      "method": "POST",
+      "path": "/heartbeat",
+      "body": {
+        "payload": "hi",
+        "len": 148
+      }
+    },
+    {
+      "conn": "A",
+      "op": "close"
+    }
+  ],
+  "expect": {
+    "unpatched": [
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 200,
+        "body": "hel",
+        "leaked": 0
+      },
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 200,
+        "body_len": 148,
+        "body": "hi..............SRVMEM::tok_alice_7f3a9c2e51tok_bob_c41d88e0a7f2tok_carol_09be3d71c6key_admin_5d2f90ab13c7e8tok_8aa31bd77f104c99tok_e2276907212c22f0",
+        "leaked": 5
+      }
+    ],
+    "patched": [
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 200,
+        "body": "hel",
+        "leaked": 0
+      },
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 400,
+        "body": "heartbeat rejected\n",
+        "leaked": 0
+      }
+    ],
+    "honeypatched": [
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 200,
+        "body": "hel",
+        "leaked": 0
+      },
+      {
+        "status": 200,
+        "body_len": 148,
+        "body": "hi..............SRVMEM::tok_a9bd82d091d5d37etok_6d6ecbe54f5f762btok_5beae03b78e5d643key_4bbbdc254ea321a390c5tok_8b6fdefa40886a62tok_e2276907212c22f0",
+        "handled_by": "decoy",
+        "forked": true,
+        "fork_result": "ok",
+        "redacted": 5,
+        "leaked": 0
+      }
+    ]
+  }
+}

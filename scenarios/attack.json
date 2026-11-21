@@ -1,0 +1,111 @@
+{
+  "name": "attack",
+  "options": {
+    "pool": 2,
+    "redact": "on"
+  },
+  "steps": [
+    {
+      "conn": "A",
+      "method": "POST",
+      "path": "/heartbeat",
+      "body": {
+        "payload": "hello",
+        "len": 5
+      }
+    },
+    {
+      "conn": "A",
+      "method": "POST",
+      "path": "/heartbeat",
+      "body": {
+        "payload": "hi",
+        "len": 64
+      }
+    },
+    {
+      "conn": "A",
+      "method": "GET",
+      "path": "/session"
+    },
+    {
+      "conn": "A",
+      "op": "close"
+    }
+  ],
+  "expect": {
+    "unpatched": [
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 200,
+        "body": "hello",
+        "leaked": 0
+      },
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 200,
+        "body_len": 64,
+        "body": "hillo...........SRVMEM::tok_alice_7f3a9c2e51tok_bob_c41d88e0a7f2",
+        "leaked": 2
+      },
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 200,
+        "body": "{\"requests\":3,\"token\":\"tok_8aa31bd77f104c99\"}",
+        "leaked": 0
+      }
+    ],
+    "patched": [
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 200,
+        "body": "hello",
+        "leaked": 0
+      },
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 400,
+        "body": "heartbeat rejected\n",
+        "leaked": 0
+      },
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 200,
+        "body": "{\"requests\":2,\"token\":\"tok_8aa31bd77f104c99\"}",
+        "leaked": 0
+      }
+    ],
+    "honeypatched": [
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 200,
+        "body": "hello",
+        "leaked": 0
+      },
+      {
+        "status": 200,
+        "body_len": 64,
+        "body": "hillo...........SRVMEM::tok_a9bd82d091d5d37etok_6d6ecbe54f5f762b",
+        "handled_by": "decoy",
+        "forked": true,
+        "fork_result": "ok",
+        "redacted": 4,
+        "leaked": 0
+      },
+      {
+        "status": 200,
+        "body": "{\"requests\":3,\"token\":\"tok_8aa31bd77f104c99\"}",
+        "handled_by": "decoy",
+        "forked": false,
+        "leaked": 0
+      }
+    ]
+  }
+}

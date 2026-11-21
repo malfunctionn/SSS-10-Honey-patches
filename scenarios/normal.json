@@ -1,0 +1,51 @@
+{
+  "name": "normal",
+  "options": {
+    "pool": 2,
+    "redact": "on"
+  },
+  "steps": [
+    {
+      "conn": "A",
+      "method": "POST",
+      "path": "/heartbeat",
+      "body": {
+        "payload": "hello",
+        "len": 3
+      }
+    },
+    {
+      "conn": "A",
+      "op": "close"
+    }
+  ],
+  "expect": {
+    "unpatched": [
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 200,
+        "body": "hel",
+        "leaked": 0
+      }
+    ],
+    "patched": [
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 200,
+        "body": "hel",
+        "leaked": 0
+      }
+    ],
+    "honeypatched": [
+      {
+        "handled_by": "target",
+        "forked": false,
+        "status": 200,
+        "body": "hel",
+        "leaked": 0
+      }
+    ]
+  }
+}
