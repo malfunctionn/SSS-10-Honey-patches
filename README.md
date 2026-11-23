@@ -21,27 +21,27 @@ Honey-Patches(Araujo et al., ACM CCS 2014)의 세션 포크 절차를 로컬 프
 
 테스트(선택): `py -m pip install pytest` 후 `py -m pytest` (macOS는 `py` 대신 `python3`)
 
-확인한 환경: Windows 11 / Python 3.14.3 (macOS는 아직 확인하지 않음)
+확인한 환경: Windows 11 / Python 3.14.3, macOS 26.6 (Apple Silicon) / Python 3.9.6, 3.15.2
 
-## 재현 확인 (Windows)
+## 재현 확인 (Windows, macOS)
 
 명세 2.3절 절차대로, 작성자의 작업 폴더가 아닌 새 폴더에 clone한 뒤 README의 명령 한 줄만 실행했습니다.
 
-| 항목 | 결과 |
-|---|---|
-| 일시 | 2026-11-23 |
-| OS | Windows 11 Home (10.0.26200, 빌드 26200) |
-| Python | 3.14.3 (`py` 런처) |
-| 실행 커밋 | `9bdd9b2` (main) |
-| 실행 명령 | `py demo.py` (다른 설정이나 설치 없음) |
-| 마지막 줄 | `ALL PASS` (종료 코드 0) |
-| 시나리오별 결과 | normal 3/3, attack 9/9, boundary 3/3, freed_session 6/6, freed_session_nofreed 6/6 |
-| 소요 시간 | 약 12.7초 |
-| 남은 프로세스 | 없음. 실행 직후 미끼·target 프로세스가 몇 초 남아 있다가 스스로 종료됨 |
-| 결과 비교 | 실행으로 만든 `results/demo.txt`를 저장소에 커밋된 `results/demo.txt`와 `compare` → `SAME` |
-| 테스트 | `py -m pytest` → 86개 모두 통과 (약 27초) |
+| 항목 | Windows | macOS |
+|---|---|---|
+| 일시 | 2026-11-23 | 2026-11-23 |
+| OS | Windows 11 Home (10.0.26200, 빌드 26200) | macOS 26.6.2 (빌드 25G83), Apple M4 Pro (arm64) |
+| Python | 3.14.3 (`py` 런처) | 3.9.6 (`/usr/bin/python3`), 3.15.2 (Homebrew `python3`) |
+| 실행 커밋 | `9bdd9b2` (main) | `b3c9e1c` (main) |
+| 실행 명령 | `py demo.py` (다른 설정이나 설치 없음) | `python3 demo.py` (다른 설정이나 설치 없음) |
+| 마지막 줄 | `ALL PASS` (종료 코드 0) | `ALL PASS` (종료 코드 0, 두 Python 버전 모두) |
+| 시나리오별 결과 | normal 3/3, attack 9/9, boundary 3/3, freed_session 6/6, freed_session_nofreed 6/6 | 같음 |
+| 소요 시간 | 약 12.7초 | 약 2.9초 |
+| 남은 프로세스 | 없음. 실행 직후 미끼·target 프로세스가 몇 초 남아 있다가 스스로 종료됨 | 없음 (`ps aux \| grep hpsim`) |
+| 결과 비교 | 실행으로 만든 `results/demo.txt`를 저장소에 커밋된 `results/demo.txt`와 `compare` → `SAME` | 같은 방법으로 `compare` → `SAME` (두 Python 버전 모두) |
+| 테스트 | `py -m pytest` → 86개 모두 통과 (약 27초) | `python3 -m pytest` → 86개 모두 통과 (약 6초, Python 3.15.2) |
 
-macOS 재현 확인은 아직 하지 않았습니다. Mac에서 같은 절차로 `python3 demo.py`를 실행한 뒤 이 표에 macOS 열을 추가할 예정입니다.
+저장소에 커밋된 `results/demo.txt`는 macOS에서 만든 것이고, Windows 결과도 이 파일과 `SAME`이므로 두 OS의 결과는 `ms` 열을 빼면 같습니다(2.3절 5단계).
 
 ## 결과 파일과 두 OS 비교
 
