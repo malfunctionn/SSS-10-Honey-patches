@@ -21,7 +21,7 @@ Honey-Patches(Araujo et al., ACM CCS 2014)의 세션 포크 절차를 로컬 프
 
 테스트(선택): `py -m pip install pytest` 후 `py -m pytest` (macOS는 `py` 대신 `python3`)
 
-확인한 환경: Windows 11 / Python 3.x.x, macOS 1x / Python 3.x.x
+확인한 환경: Windows 11 / Python 3.x.x, macOS 26.6 (Apple Silicon) / Python 3.9.6, 3.15.2
 
 ## 결과 파일과 두 OS 비교
 
