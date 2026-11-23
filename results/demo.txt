@@ -1,0 +1,48 @@
+== normal ==
+step mode          status len  handled forked redacted leaked ms    body
+1    unpatched     200    3    target  no     0        0      2.4   hel
+1    patched       200    3    target  no     0        0      1.2   hel
+1    honeypatched  200    3    target  no     0        0      1.2   hel
+RESULT normal: PASS (3/3)
+
+== attack ==
+step mode          status len  handled forked redacted leaked ms    body
+1    unpatched     200    5    target  no     0        0      1.2   hello
+1    patched       200    5    target  no     0        0      1.1   hello
+1    honeypatched  200    5    target  no     0        0      1.4   hello
+2    unpatched     200    64   target  no     0        2      0.4   hillo...........SRVMEM::tok_alice_7f3a9c2e51tok_bob_c41d88e0a7f2
+2    patched       400    19   target  no     0        0      0.4   heartbeat rejected\n
+2    honeypatched  200    64   decoy   yes    4        0      1.9   hillo...........SRVMEM::tok_a9bd82d091d5d37etok_6d6ecbe54f5f762b
+3    unpatched     200    45   target  no     0        0      0.4   {"requests":3,"token":"tok_8aa31bd77f104c99"}
+3    patched       200    45   target  no     0        0      0.4   {"requests":2,"token":"tok_8aa31bd77f104c99"}
+3    honeypatched  200    45   decoy   no     0        0      0.4   {"requests":3,"token":"tok_8aa31bd77f104c99"}
+RESULT attack: PASS (9/9)
+
+== boundary ==
+step mode          status len  handled forked redacted leaked ms    body
+1    unpatched     200    5    target  no     0        0      1.2   hello
+1    patched       200    5    target  no     0        0      1.2   hello
+1    honeypatched  200    5    target  no     0        0      1.3   hello
+RESULT boundary: PASS (3/3)
+
+== freed_session ==
+step mode          status len  handled forked redacted leaked ms    body
+1    unpatched     200    3    target  no     0        0      1.1   hel
+1    patched       200    3    target  no     0        0      1.1   hel
+1    honeypatched  200    3    target  no     0        0      1.2   hel
+2    unpatched     200    148  target  no     0        5      0.7   hi..............SRVMEM::tok_alice_7f3a9c2e51tok_bob_c41d88e0a7f2tok_carol_09be3d71c6key_admin_5d2f90ab13c7e8tok_8aa31bd77f104c99tok_e2276907212c22f0
+2    patched       400    19   target  no     0        0      0.7   heartbeat rejected\n
+2    honeypatched  200    148  decoy   yes    5        0      2.8   hi..............SRVMEM::tok_a9bd82d091d5d37etok_6d6ecbe54f5f762btok_5beae03b78e5d643key_4bbbdc254ea321a390c5tok_8b6fdefa40886a62tok_e2276907212c22f0
+RESULT freed_session: PASS (6/6)
+
+== freed_session_nofreed ==
+step mode          status len  handled forked redacted leaked ms    body
+1    unpatched     200    3    target  no     0        0      1.1   hel
+1    patched       200    3    target  no     0        0      1.1   hel
+1    honeypatched  200    3    target  no     0        0      1.5   hel
+2    unpatched     200    148  target  no     0        5      0.7   hi..............SRVMEM::tok_alice_7f3a9c2e51tok_bob_c41d88e0a7f2tok_carol_09be3d71c6key_admin_5d2f90ab13c7e8tok_8aa31bd77f104c99tok_e2276907212c22f0
+2    patched       400    19   target  no     0        0      0.7   heartbeat rejected\n
+2    honeypatched  200    148  decoy   yes    3        2      2.9   hi..............SRVMEM::tok_a9bd82d091d5d37etok_6d6ecbe54f5f762btok_carol_09be3d71c6key_4bbbdc254ea321a390c5tok_8aa31bd77f104c99tok_e2276907212c22f0
+RESULT freed_session_nofreed: PASS (6/6)
+
+ALL PASS
