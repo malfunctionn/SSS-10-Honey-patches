@@ -75,6 +75,8 @@ python -m hpsim.cli run scenarios/attack.json [--mode all|unpatched|patched|hone
 
 `normal`, `attack`, `boundary`의 입력과 기대값은 11주차 보고서에 낸 고정 사례라 수정하지 않습니다.
 
+세 고정 사례에는 각 연결의 마지막에 연결을 닫는 `close` 단계를 넣었습니다. runner가 연결 정리가 끝났는지 확인하기 위한 단계이며, 요청 입력과 기대 결과는 11주차와 같습니다. 13주차 조교 답변에 따라 고정 사례 유지 기준에 맞는 것으로 확인했습니다.
+
 ## 저장소 구조
 
 ```

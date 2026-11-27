@@ -1,4 +1,4 @@
-# honeypatch-sim 구현 명세 (v1.4.1)
+# honeypatch-sim 구현 명세 (v1.5)
 
 Honey-Patches(Araujo et al., ACM CCS 2014)의 세션 포크 절차를 로컬 프로세스로 모사하는 시뮬레이터의 구현 명세다. 이 문서 하나만 보고 LLM이 처음부터 끝까지 구현할 수 있도록, 선택지가 있는 곳은 모두 하나로 정해 두었다. 구현자는 이 문서에 없는 동작을 임의로 추가하지 않는다. 문서가 모호하면 15절의 우선순위를 따른다.
 
@@ -20,6 +20,19 @@ Honey-Patches(Araujo et al., ACM CCS 2014)의 세션 포크 절차를 로컬 프
 **v1.4 변경 사항.** 분담 전에 프로세스 안의 모듈 인터페이스를 확정했다. 3.1절(import 방향, 파일 소유자, 락 규칙), 5.4절(`memory.py` 공개 API, `Session` 이동), 7.4절(`ServerState`와 honeypatch 함수 시그니처), 8.1절(`pool.py` API)을 추가하고, 7.3절 의사 코드를 새 시그니처에 맞췄다. 동작과 기대값은 바뀌지 않았다.
 
 **v1.4.1 변경 사항.** 14절 표에 중복으로 들어간 3열 머리글을 지웠다. 내용은 바뀌지 않았다.
+
+**v1.5 변경 사항 (13주차 조교 피드백 반영).**
+
+| 피드백 | 반영 |
+|---|---|
+| 10팀 반례 후보: 해제 메모리 제외 시 비밀 노출(확인됨), 시드 기반 가짜 값 예측 | 11.4절 반례 목록에 C01(확인됨), C02(가짜 값 예측)로 등록하고 분류 근거를 적게 함 |
+| 10팀 13주차 제안: 미끼 풀 고갈·재생성 포함 | 8절 재생성과 반납 조건 2~4번을 13주차(M6) 필수로 두고, 풀 관련 반례 C11~C14를 추가 |
+| 10팀 질문 답변: 고정 사례의 `close` 단계는 기준에 맞음, README에 기록 | 11.1절에 `close` 단계 추가 사실을 명시하고 README 기록을 D의 13주차 작업으로 둠 |
+| 공통: 보호가 없을 때 공격이 실제로 성공하는 장면 제시 | 11.4절 모든 위반 사례에 unpatched 기대값(실제 비밀 노출)을 함께 적고, 보고서에 unpatched 행을 반드시 넣게 함 |
+| 공통: AI가 작성한 부분과 직접 확인한 부분 구분 | 15절 8번 규칙 추가. 커밋·PR·보고서에 `[AI 작성]`/`[직접 확인]`을 구분해 적음 |
+| 공통: README와 보고서를 같은 시점 기준으로 | 11.5절에 기준 커밋 규칙 추가. 보고서의 모든 결과는 같은 커밋 해시에서 만든 것만 씀 |
+
+추가 사례는 고정 사례와 섞이지 않게 `scenarios/extra/`에 둔다. 11주차 고정 사례 3종과 12주차 필수 2종의 입력·기대값은 바꾸지 않았다.
 
 ## 1. 목표와 범위
 
@@ -711,11 +724,13 @@ ALL PASS
 |---|---|
 | 세 mode 모두 | 200, 본문 `hello`, handled_by=target, forked=false, leaked=0 |
 
+**`close` 단계.** 세 파일은 각 연결의 마지막에 `{"conn": "A", "op": "close"}`를 둔다. 연결 정리 완료를 runner가 확인하기 위한 단계이며, 요청 입력과 기대 결과에는 영향이 없다. 13주차 조교 답변에 따라 고정 사례 유지 기준에 맞으며, README에 이 사실을 적는다.
+
 **고정 규칙.** 이 세 파일의 `steps`와 `expect`는 11주차 보고서에 적어 낸 값이다. 과제 규칙상 14주차까지 수정할 수 없으므로, 구현이 기대값과 어긋나면 시나리오가 아니라 구현을 고친다.
 
 ### 11.2 추가 사례 (`tests/`와 `scenarios/`)
 
-**12주차 필수**로 표시한 사례는 M4 완료 기준에 포함된다. 나머지는 13주차(M6)에 다룬다.
+**12주차 필수**로 표시한 사례는 M4 완료 기준에 포함되며 `scenarios/`에 둔다. 나머지는 13주차(M6)에 다루며 `scenarios/extra/`에 둔다. 기대값은 아래 표 그대로 쓰고, 실행 전에 파일로 커밋한다.
 
 | 파일 | 설정 | 내용 | honeypatched 기대 |
 |---|---|---|---|
@@ -742,13 +757,71 @@ attack.json의 각 요청에 대해 unpatched와 honeypatched를 비교한다.
 - 본문 길이가 같고, 다른 바이트는 redaction 대상 레코드가 차지하는 구간에만 있다.
 - 포크 전후로 클라이언트 소켓이 같은 객체다(재연결 없음).
 
+### 11.4 반례 탐색 (13주차)
+
+13주차 슬라이드의 여섯 방향(경계값, 표기 변형, 반복·동시, 자원 고갈, 상태 전이, 알려진 한계)으로 고른 입력이다. **기대 결과는 실행 전에 이 표대로 시나리오 파일에 적어 커밋한다.** 실행 결과가 기대와 다르면 기대값을 고치지 않고 11.5절 절차로 원인을 분석한다. "예상 분류"는 실행 전 추정이며, 실행 후 근거와 함께 확정한다.
+
+모든 위반 사례는 unpatched 기대값(실제 비밀 노출)을 함께 적는다. 보호가 없을 때 공격이 성공하는 장면을 같은 표에서 보이기 위함이다.
+
+| ID | 방향 | 입력 (파일) | 기대 결과 (실행 전 작성) | 예상 분류 | 담당 |
+|---|---|---|---|---|---|
+| C01 | 알려진 한계 | `freed_session_nofreed.json` (12주차, 기존) | honeypatched: redacted=3, **leaked=2** (carol, 닫힌 B의 실제 토큰). 같은 요청이 redact=on이면 leaked=0 | 구현 선택 확인됨. `nofreed`는 반례 재현용 설정이며 기본값 `on`에서는 막힘 | A |
+| C02 | 알려진 한계 | `tests/test_cx_memory.py::test_fake_value_predictable` | 저장소에 공개된 `SEED`로 `fake_value("H1", ...)`를 계산하면 honeypatched 응답의 64~83 바이트와 같다. 공격자는 이 값으로 미끼임을 알아챌 수 있다 | SCOPE (결정적 가짜 값은 재현성을 위한 이 구현의 선택. 원논문 4.1절은 무작위 생성). 보완 메모: 배포마다 비공개 시드 사용 | A |
+| C03 | 반복·동시 | `extra/repeat_attack_two_conns.json`: A, B 두 연결에서 같은 공격(`hi`, len=64) | honeypatched: 두 응답 본문이 바이트 단위로 같고 둘 다 decoy, leaked=0. unpatched: 둘 다 leaked=2 | 반례 아님 예상 (가짜 값이 일관되어 기만이 유지됨) | A |
+| C04 | 경계값 | `extra/own_token.json` (11.2) | 11.2절 표 그대로. 자기 토큰(108~127)은 보존 | 반례 아님 예상 | A |
+| C05 | 표기 변형 | `extra/unicode_payload.json`: `{"payload":"héllo","len":6}` (UTF-8 6바이트) | 세 mode 모두 200, 6바이트 `h\xc3\xa9llo`, target, forked=false. 문자 수(5)로 길이를 재면 honeypatched가 잘못 포크함 | 반례 아님 예상. 다르면 BUG | B |
+| C06 | 경계값 | `extra/boundary_plus1.json` (11.2) | 11.2절 표 그대로 (최소 위반 len=6) | 반례 아님 예상 | B |
+| C07 | 경계값 | `extra/len_zero_and_full.json`: `len=0`, 16바이트 payload에 `len=16` | 세 mode 모두 200, 본문 각각 0바이트·16바이트, forked=false | 반례 아님 예상 | B |
+| C08 | 표기 변형 | `extra/bad_input.json` (11.2) + `len=3.0`, `len=1e9` | 11.2절 표 그대로. `3.0`은 400 `bad request\n`. `1e9`(JSON 실수)도 400 | 다르면 BUG | B |
+| C09 | 표기 변형 | `extra/internal_path_variants.json`: `GET /_hp/state`, `/%5Fhp/state`, `/_HP/state`, `//_hp/state`, `/_hp/state?x=1` | 세 mode 모두 404 `not found\n`. 백엔드 힙이 응답에 나오면 안 됨 | 다르면 BUG (내부 상태 노출) | C |
+| C10 | 상태 전이 | `extra/attack_then_normal.json`: A 공격 후 같은 연결로 `{"payload":"abc","len":3}` | honeypatched: 두 번째 요청도 decoy, 200 `abc`, forked=false, fork_result=none. 본문이 unpatched와 같음 | 반례 아님 예상 | C |
+| C11 | 자원 고갈 | `extra/pool_exhaust.json` (11.2, pool=1) | 11.2절 표 그대로. B는 400, fork_result=pool_exhausted | 명세대로이나 풀이 차면 패치 사실이 드러남. 분류: SCOPE (풀 크기 한정). 근거와 함께 기록 | B |
+| C12 | 자원 고갈 | `extra/pool_regen.json`: pool=1, A 공격 → A close → `wait_pool` → C 공격 | C는 decoy, forked=true. `/pool`이 다시 `available` | **수정 전: wait_pool 시간 초과로 FAIL 예상** (재생성 미구현). BUG → B·C 수정 후 PASS | B |
+| C13 | 자원 고갈 | `extra/pool_zero.json` (11.2) | 11.2절 표 그대로 | 반례 아님 예상 | B |
+| C14 | 상태 전이 | `extra/decoy_dies.json`: A 공격 후 테스트가 미끼 프로세스를 종료하고 A가 다시 요청 | 502 `bad gateway\n` 후 연결 종료, 미끼는 recycling | **수정 전: 응답 없이 연결만 끊김** (M4는 502 미구현). BUG → C 수정 후 PASS. 실행은 `tests/test_cx_proxy.py` | C |
+| C15 | 자원 고갈 | `extra/idle_timeout.json` (11.2) | 11.2절 표 그대로 | 다르면 BUG | C |
+| C16 | 자원 고갈 | `extra/session_timeout.json`: session-timeout=0.3, A 공격 → sleep 0.6 → A 요청 | 마지막 요청은 closed=true, 미끼 반납 | **수정 전: 그대로 응답 예상** (M4는 점유 시간 미검사). BUG → C 수정 후 PASS | C |
+| C17 | 반복·동시 | `extra/multi_attack.json`, `extra/concurrent.json` (11.2) | 11.2절 표 그대로 | 반례 아님 예상 | D |
+| C18 | 알려진 한계 | `extra/reconnect_escape.json`: A 공격으로 포크 → A close → 새 연결 B로 정상 요청 | B는 target, 실제 세션 | PAPER (원논문도 연결 단위 처리, 3절. 13주차 조교 답변과 같은 분류) | D |
+| C19 | 알려진 한계 | `python -m hpsim.cli bench scenarios/attack.json --n 30` | honeypatched의 ② 응답 시간 중앙값이 unpatched보다 큼 (제어 호출 2회와 재전송 1회) | PAPER (응답 시간 차로 미끼 탐지). 원논문의 해당 절은 보고서에 인용 `[확인 필요]` | D |
+| C20 | 상태 전이 | Windows에서 `demo.py` 종료 직후 hpsim 프로세스 수 (12주차 관찰) | 종료 직후 0개 | **수정 전: 0.6~2초 이상 남음**. BUG (프록시가 `/shutdown`에서 자식 종료를 기다리지 않음) → C 수정 후 재측정 | C |
+| C21 | 표기 변형 | `extra/redact_off.json`, `extra/leak_freed.json` (11.2) | 11.2절 표 그대로 | 반례 아님 예상 (설정에 따른 의도된 노출) | A |
+
+### 11.5 반례 기록·분류·수정 절차
+
+**기록.** `results/counterexamples.md`에 아래 열로 적는다. 입력 파일, 실행 명령, 출력 로그 경로를 함께 남긴다.
+
+| 번호 | 입력 | 기대 결과 | 실제 결과 | 분류 | 처리 |
+|---|---|---|---|---|---|
+
+**분류.**
+
+| 분류 | 기준 | 처리 |
+|---|---|---|
+| BUG (구현 버그) | 이 명세대로 동작하지 않음 | 고친 뒤 같은 입력으로 재실행. 수정 전·후 결과를 나란히 기록 |
+| SCOPE (명세상 미지원) | 이 명세가 다루지 않기로 했거나, 이 구현의 선택에서 생긴 한계 | 한계로 기록, 필요하면 보완 방법 메모 |
+| PAPER (원논문 한계) | 원래 방어도 막지 못함 | 원논문의 해당 절과 함께 기록 |
+
+구분이 어려우면 원논문에서 같은 상황을 다루는지 먼저 확인하고 판단 근거를 적는다.
+
+**수정 전·후.** 반례를 고치기 전에 현재 main으로 `python -m hpsim.cli suite scenarios/extra --out results/before`를 한 번 실행해 저장한다. 고친 뒤 같은 명령으로 `results/after`를 만든다. 두 결과를 `compare`로 비교한다.
+
+**기준 시점.** README, `results/`, 보고서에 쓰는 모든 결과는 같은 커밋에서 만든 것이어야 한다. 보고서와 `results/counterexamples.md` 맨 위에 기준 커밋 해시를 적는다.
+
+**반례가 없다는 결과.** 기대와 같게 나온 사례도 입력과 결과를 기록한다. 시험한 입력과 근거가 있으면 "반례 없음"도 유의미한 결과다.
+
 ## 12. 변수 실험 (14주차)
 
-| 변수 | 값 | 관찰 |
-|---|---|---|
-| `redact` | on / off / nofreed | attack.json, leak_freed.json의 `leaked` |
-| `pool` | 0 / 1 / 2 | 공격 연결 3개를 동시에 열었을 때 decoy로 간 수와 400을 받은 수 |
-| 응답 시간 | mode별 | `python -m hpsim.cli bench scenarios/attack.json --n 30` 으로 ② 요청의 중앙값과 표준편차 |
+13주차에 아래 계획을 확정하고, 14주차에는 이 표대로만 실행한다. 원논문의 수치와 직접 비교하지 않고, 같은 조건에서 변수 하나만 바꾼 결과를 비교한다.
+
+| 실험 | 변수 (하나만 바꿈) | 고정 조건 | 지표 | 반복·대표값 |
+|---|---|---|---|---|
+| E1 redaction | `redact` = on / off / nofreed | honeypatched, pool=2, `attack.json`, `freed_session.json`, `leak_freed.json` | `leaked`, `redacted` | 결정적이므로 1회. 3회 실행해 같음을 확인 |
+| E2 미끼 풀 크기 | `pool` = 0 / 1 / 2 | honeypatched, redact=on, 공격 연결 3개를 번갈아 열어 둔 채 각 1회 공격 | decoy로 간 수, 400을 받은 수, `fork_result` 분포 | 결정적이므로 1회. 3회 실행해 같음을 확인 |
+| E3 응답 시간 | mode = unpatched / patched / honeypatched | `attack.json`의 ② 요청 | 응답 시간(ms) | 30회, 중앙값과 표준편차 |
+| E4 재생성 시간 | 없음 (측정만) | pool=1, 반납부터 `available`까지 | 경과 시간(ms) | 30회, 중앙값 |
+
+**측정 조건.** OS 이름·버전, Python 버전, 실행 명령, 기준 커밋 해시를 결과와 함께 적는다. Windows와 macOS에서 각각 측정하고, OS 간 응답 시간은 비교하지 않는다.
 
 `bench`는 판정 없이 mode별 중앙값 표만 낸다. 논문이 보고한 지연(redaction 약 0.25초)은 CRIU에서 나오므로 이 구현에서는 재현되지 않는다. 대신 포크 경로의 추가 왕복(제어 호출 2회 + 재전송 1회)이 시간 차로 관찰된다. 이 차이를 "공격자가 허니패치를 구분할 수 있는 타이밍 채널"의 근거로 정리한다.
 
@@ -768,7 +841,7 @@ attack.json의 각 요청에 대해 unpatched와 honeypatched를 비교한다.
 | M3 상태 복원 | 12 | `honeypatch.py`의 체크포인트·스냅샷, `server.py`의 decoy 문맥과 `/_hp/restore`. **프록시와 풀 없이** 검증 | `test_fork.py` 통과 (아래) |
 | M4 포크 통합 | 12 | 프록시의 포크 조율(9.1절 3번, 9.2절), 풀은 획득과 단순 반납만(8절) | attack.json이 세 mode에서 PASS, `freed_session.json`, `freed_session_nofreed.json` PASS, 11.3절 테스트 통과 |
 | M5 실행 묶음 | 12 | `demo.py`, `report.py`, `results/` 저장, `cli.py compare`, README, `.gitattributes` | 2.3절 절차를 Windows와 macOS에서 각각 수행해 둘 다 `ALL PASS`, 남은 프로세스 없음, 두 `results/demo.txt`가 `SAME` |
-| M6 풀·확장 사례 | 13 | 미끼 재생성, 반납 조건 2~4번, 11.2절 나머지 사례 | 11.2절 전부 PASS |
+| M6 풀·확장 사례·반례 | 13 | 미끼 재생성, 반납 조건 2~4번, `GET /pool`, runner의 `sleep`·`wait_pool`, `cli suite`, 11.2절 나머지 사례, 11.4절 반례 | 11.2절 전부 PASS, 11.4절 전부 실행·분류, BUG로 분류한 반례의 수정 전·후 기록, 12절 실험 계획 확정 |
 | M7 실험 | 14 | `bench`, 12절 변수 실험 | 12절 표의 관찰값 기록 |
 
 **M3 `test_fork.py`.** 조교 피드백에 따라 풀보다 상태 복원을 먼저 확인하는 단계다. 테스트 안에서 9.2절의 `/fork/acquire`와 `/fork/restore`만 흉내 내는 가짜 제어 서버를 띄운다(acquire는 항상 성공, restore는 받은 스냅샷을 decoy의 `/_hp/restore`로 그대로 전달하고 사본을 테스트에 남김). target(honeypatched, redact=on)과 decoy 하나를 이 가짜 제어 서버에 연결하고, 프록시 없이 `X-HP-Conn: c1`으로 직접 요청한다.
@@ -791,6 +864,7 @@ attack.json의 각 요청에 대해 unpatched와 honeypatched를 비교한다.
 5. 금지: 고정 포트, `time.sleep`에 의존한 동기화(시나리오의 `sleep` op 제외), 난수, 외부 패키지, 전역 락을 쥔 HTTP 호출, 클라이언트 응답에 내부 정보 노출, 2.1절 표의 규칙 위반.
 6. 작성자 OS에서만 실행해 보고 완료로 판단하지 않는다. 2.1절 규칙을 코드 리뷰 체크리스트로 쓴다.
 7. 모든 서버 스레드는 데몬으로 두고, 테스트가 끝난 뒤 남은 `python -m hpsim.*` 프로세스가 없어야 한다.
+8. AI가 작성한 부분과 사람이 직접 확인한 부분을 구분해 기록한다. 커밋 메시지나 PR 설명에 `[AI 작성]` 범위와 `[직접 확인]` 방법(실행한 명령, 대조한 절)을 적고, 보고서의 AI 활용 기록도 같은 구분을 따른다.
 
 ## 부록 A. 12주차 업무 분담
 
@@ -809,3 +883,25 @@ attack.json의 각 요청에 대해 unpatched와 honeypatched를 비교한다.
 
 **순서 의존.** `proc.py`는 B가, `memory.py`는 A가 뼈대 다음으로 가장 먼저 실제 구현을 머지한다. 그 전까지 다른 사람은 뼈대의 시그니처대로 흉내 내는 임시 함수로 작업한다.
 
+## 부록 B. 13주차 업무 분담
+
+파일 소유자는 부록 A와 같다. 새 파일은 아래 표의 소유자가 만든다. 마감은 2026-11-30(월) 23:59다.
+
+| 담당 | 맡는 파일 | 예상 분량 · 난이도 | 구현·검증할 절 | 반례 |
+|---|---|---|---|---|
+| **A. 메모리·복원** | `tests/test_cx_memory.py` (신규) | 약 150줄 · 하 | 11.4 (C01~C04, C21), 11.5 분류 근거, 12절 E1 설계 | C01, C02, C03, C04, C21 |
+| **B. 서버·프로세스** | `pool.py`, `tests/test_pool.py` (신규), `server.py` (필요 시) | 약 250줄 · 중 | 8절 재생성(`recycling → available`), 8.1 `release`, 11.4 (C05~C08, C11~C13), 12절 E2·E4 설계 | C05, C06, C07, C08, C11, C12, C13 |
+| **C. 프록시** | `proxy.py`, `tests/test_cx_proxy.py` (신규) | 약 300줄 · 상 | 8절 반납 조건 2~4번, 9.1 502, 9.2 `GET /pool`, `/shutdown` 종료 순서, 11.4 (C09, C10, C14~C16, C20) | C09, C10, C14, C15, C16, C20 |
+| **D. 실행·문서** | `runner.py`, `report.py`, `cli.py`, `scenarios/extra/`, `results/counterexamples.md`, README | 약 250줄 + JSON·문서 · 중 | 10.1 `sleep`·`wait_pool`, `cli suite`·`bench`, 11.2 나머지 시나리오 파일, 11.4 기대값 파일화, 11.5 기록, 12절 계획 문서 | C17, C18, C19 |
+
+**전원이 읽을 절:** 1, 2.1, 3.1, 11.4, 11.5, 15. LLM에는 명세 전체를 주고 "이 중 N절만 구현"이라고 지시한다.
+
+**순서.**
+
+1. **11/27 (금)** D가 11.4절 기대값으로 `scenarios/extra/*.json`을 만들어 먼저 머지한다(실행 전 기대값 고정). 각자 자기 반례의 기대값을 이 표와 대조해 확인한다.
+2. **11/28 (토) 오전** D가 현재 main으로 `suite`를 돌려 `results/before/`에 저장한다(수정 전 기록). 이 시점까지 아무도 동작 코드를 머지하지 않는다.
+3. **11/28~29** B는 재생성, C는 502·시간 초과·`/pool`·종료 순서, D는 `sleep`·`wait_pool`·`suite`·`bench`를 구현한다. A는 C02 테스트와 분류 근거를 쓴다.
+4. **11/29 (일) 저녁** 전원 머지 후 D가 `results/after/`를 만들고 `compare`로 수정 전·후를 정리한다. 남은 반례는 SCOPE 또는 PAPER로 분류한다.
+5. **11/30 (월)** Windows 1명, macOS 1명이 2.3절 절차를 다시 수행한다. D가 기준 커밋 해시를 정하고 README, `results/`, 보고서를 그 커밋 기준으로 맞춘다.
+
+**보고서 분담.** 추가 검증 사례와 수정 전·후는 D, 반례 분류 근거는 반례 담당자, 14주차 실험 계획은 A(E1), B(E2, E4), D(E3)가 나눠 쓰고 D가 취합한다. AI 활용 기록은 15절 8번 규칙대로 각자 `[AI 작성]`/`[직접 확인]`을 구분해 쓴다.
